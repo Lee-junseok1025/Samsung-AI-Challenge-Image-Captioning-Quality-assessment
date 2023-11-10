@@ -168,19 +168,15 @@ class MANIQA2transformer(nn.Module):
             else:
                 outputs = self.inference(features,src,tgt)
 
-            # outputs = self.fc(outputs.squeeze(1))
             scores = F.log_softmax(outputs.squeeze(0), dim=1)
             scores = top_k_scores.expand_as(scores) + scores
             
-            # 첫번째 스텝은 모두 같은 score을 가진다 <START>라는 뿌리로 시작하기 때문
             if step == 1:
                 top_k_scores, top_k_words = scores[0].topk(k, dim=0)  # (s)
             else:
                 top_k_scores, top_k_words = scores.view(-1).topk(k, dim=0)  # (s)
 
-            # Score를 정립시켜서 index를 구한다.
-            # prev_word_inds : tensor([0, 0, 1, 0], device='cuda:0') 
-	        # next_word_inds : tensor([78, 30, 50, 31], device='cuda:0')
+            
             prev_word_inds = top_k_words // vocab_size  # (s)
             next_word_inds = top_k_words % vocab_size  # (s)
             # 새로둔 단어를 seqs에 더한다.
@@ -188,12 +184,9 @@ class MANIQA2transformer(nn.Module):
                 seqs = next_word_inds.unsqueeze(1)
             else:
                 seqs = torch.cat([seqs[prev_word_inds], next_word_inds.unsqueeze(1)], dim=1)  # (s, step+1)
-            # Which sequences are incomplete (didn't reach <end>, <end>idx == 2)?
-            # 인덱스 마지막 저장하기
             incomplete_inds = [ind for ind, next_word in enumerate(next_word_inds) if
                                next_word != word2idx['<EOS>']]
             complete_inds = list(set(range(len(next_word_inds))) - set(incomplete_inds))
-            # 마지막 단어 세팅
             if len(complete_inds) > 0:
                 complete_seqs.extend(seqs[complete_inds].tolist())
                 complete_seqs_scores.extend(top_k_scores[complete_inds])
